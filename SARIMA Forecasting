@@ -1,1 +1,10 @@
-# birdistheword
+from pmdarima import auto_arima
+import pandas as pd
+import warnings
+
+warnings.filterwarnings('ignore')
+organic_search = pd.read_csv(r"C:\Users\amacchia\Desktop\email parsing\Organic_Search_Revenue_201801-202107.csv")
+
+stepwise_fit = auto_arima(organic_search['Amount'], trace=True, suppress_warnings='True')
+
+stepwise_fit.summary()
