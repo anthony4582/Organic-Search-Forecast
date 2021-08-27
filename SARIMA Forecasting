@@ -8,3 +8,92 @@ organic_search = pd.read_csv(r"C:\Users\amacchia\Desktop\email parsing\Organic_S
 stepwise_fit = auto_arima(organic_search['Amount'], trace=True, suppress_warnings='True')
 
 stepwise_fit.summary()
+
+#Separate Project
+
+
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
+import pandas as pd
+import itertools
+import datetime as dt
+from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.api import SARIMAX
+
+organic_search = pd.read_csv(r"C:\Organic_Search_Revenue_201801-202107.csv")
+organic_search = organic_search[['Week_Start_Date', 'Amount']]
+organic_search['Week_Start_Date'] = pd.to_datetime(organic_search['Week_Start_Date'], format='%Y-%m-%d')
+organic_search['Amount'] = organic_search['Amount'].astype(int)
+organic_search.set_index = organic_search['Week_Start_Date']
+# print(organic_search.info())
+# print(organic_search)
+
+# Visualize the total organic search revenue since 2018 by week
+fig, ax = plt.subplots(1, 1, figsize=[10, 5])  # Set dimensions for figure
+plt.plot(organic_search.groupby('Week_Start_Date').Amount.sum(), color='g')
+plt.title('Organic Search Revenue Time Series')
+fmt = '${x:,.0f}'
+tick = mtick.StrMethodFormatter(fmt)
+ax.yaxis.set_major_formatter(tick)
+plt.ylabel('Revenue')
+plt.xlabel('Week')
+plt.grid(True)
+
+# Augmented Dickey-Fuller test
+ad_fuller_result = adfuller(organic_search['Amount'])
+print(f'ADF Statistic: {ad_fuller_result[0]}')
+print(f'p-value: {ad_fuller_result[1]}')
+
+# SARIMA Model
+best_model = SARIMAX(organic_search['Amount'], order=(1, 1, 1), seasonal_order=(1, 1, 1, 52)).fit(dis=-1)
+print(best_model.summary())
+best_model.plot_diagnostics(figsize=(11, 5))
+
+# Forecasting 2 years steps ahead
+pd.DataFrame(pd.date_range(start='2021-07-26', end='2023-07-31', freq='W'))
+forecast_values = best_model.get_prediction(start=185, end=289, dynamic=True)
+# print(forecast_values)
+
+# Confidence intervals of the forecasted values
+forecast_ci = forecast_values.conf_int()
+forecast_ci['Week_Start_Date'] = pd.date_range(start='7-26-2021', end='7-31-2023', periods=105)
+# print(forecast_ci)
+
+# Plot the data
+ax = organic_search.plot(x='Week_Start_Date', y='Amount', figsize=(10, 5), legend=True, color='g')
+plt.ylim(0, 2000000)
+
+# Plot the forecasted values
+forecast_ls = forecast_values.predicted_mean
+forecast = pd.to_numeric(list(forecast_ls.round()), errors='coerce')
+prediction = pd.Series(forecast, name='Amount',
+                       index=pd.Index(pd.date_range(start='7-26-2021', end='7-31-2023', periods=105),
+                                      name='Week_Start_Date'))
+presage = pd.DataFrame(prediction.reset_index())
+prophesy = pd.concat([organic_search, presage])
+pd.options.display.float_format = '${:,.2f}'.format
+plt.plot(prediction, color='b', label='Prediction')
+plt.ylim(0, 2000000)
+
+# Plot the confidence intervals
+ax.fill_between(forecast_ci.Week_Start_Date,
+                forecast_ci.iloc[:, 0],
+                forecast_ci.iloc[:, 1], color='#D3D3D3', alpha=.9)
+plt.title('Organic Search Revenue Forecast', size=16)
+plt.ylabel('Revenue', size=12)
+plt.xlabel('Week', size=12)
+fmt = '${x:,.0f}'
+tick = mtick.StrMethodFormatter(fmt)
+ax.yaxis.set_major_formatter(tick)
+plt.ylim(0, 2000000)
+plt.legend(loc='upper center', prop={'size': 12})
+
+plt.show()
+
+print(prophesy)
+prophesy['year'] = prophesy.Week_Start_Date.dt.year
+prophesy['month'] = prophesy.Week_Start_Date.dt.month
+annual = prophesy.groupby('year').Amount.sum()
+print(annual)
+monthly = prophesy.groupby(['year','month']).Amount.sum()
+print(monthly)
